@@ -1,16 +1,30 @@
+/*
+    src/widget.cpp -- Base class of all widgets
+
+    NanoGUI was developed by Wenzel Jakob <wenzel@inf.ethz.ch>.
+    The widget drawing code is based on the NanoVG demo application
+    by Mikko Mononen.
+
+    All rights reserved. Use of this source code is governed by a
+    BSD-style license that can be found in the LICENSE.txt file.
+*/
+
 #include <nanogui/widget.h>
 #include <nanogui/layout.h>
 #include <nanogui/theme.h>
 #include <nanogui/window.h>
 #include <nanogui/opengl.h>
 #include <nanogui/screen.h>
+#include <nanogui/serializer/core.h>
 
-NANOGUI_NAMESPACE_BEGIN
+NAMESPACE_BEGIN(nanogui)
 
-Widget::Widget(Widget *parent) 
-    : mParent(nullptr), mLayout(nullptr), mPos(Vector2i::Zero()),
-      mSize(Vector2i::Zero()), mFixedSize(Vector2i::Zero()), mVisible(true),
-      mEnabled(true), mFocused(false), mMouseFocus(false), mTooltip("") {
+Widget::Widget(Widget *parent)
+    : mParent(nullptr), mTheme(nullptr), mLayout(nullptr),
+      mPos(Vector2i::Zero()), mSize(Vector2i::Zero()),
+      mFixedSize(Vector2i::Zero()), mVisible(true), mEnabled(true),
+      mFocused(false), mMouseFocus(false), mTooltip(""), mFontSize(-1.0f),
+      mCursor(Cursor::Arrow) {
     if (parent) {
         parent->addChild(this);
         mTheme = parent->mTheme;
@@ -18,10 +32,14 @@ Widget::Widget(Widget *parent)
 }
 
 Widget::~Widget() {
-    for (auto child : mChildren)
-        delete child;
-    if (mLayout)
-        delete mLayout;
+    for (auto child : mChildren) {
+        if (child)
+            child->decRef();
+    }
+}
+
+int Widget::fontSize() const {
+    return mFontSize < 0 ? mTheme->mStandardFontSize : mFontSize;
 }
 
 Vector2i Widget::preferredSize(NVGcontext *ctx) const {
@@ -75,7 +93,8 @@ bool Widget::mouseMotionEvent(const Vector2i &p, const Vector2i &rel, int button
         bool contained = child->contains(p - mPos), prevContained = child->contains(p - mPos - rel);
         if (contained != prevContained)
             child->mouseEnterEvent(p, contained);
-        if ((contained || prevContained) && child->mouseMotionEvent(p - mPos, rel, button, modifiers))
+        if ((contained || prevContained) &&
+            child->mouseMotionEvent(p - mPos, rel, button, modifiers))
             return true;
     }
     return false;
@@ -91,11 +110,12 @@ bool Widget::scrollEvent(const Vector2i &p, const Vector2f &rel) {
     }
     return false;
 }
-bool Widget::mouseDragEvent(const Vector2i &p, const Vector2i &rel, int button, int modifiers) {
+
+bool Widget::mouseDragEvent(const Vector2i &, const Vector2i &, int, int) {
     return false;
 }
 
-bool Widget::mouseEnterEvent(const Vector2i &p, bool enter) {
+bool Widget::mouseEnterEvent(const Vector2i &, bool enter) {
     mMouseFocus = enter;
     return false;
 }
@@ -105,13 +125,29 @@ bool Widget::focusEvent(bool focused) {
     return false;
 }
 
-bool Widget::keyboardEvent(int key, int scancode, bool press, int modifiers) {
+bool Widget::keyboardEvent(int, int, int, int) {
+    return false;
+}
+
+bool Widget::keyboardCharacterEvent(unsigned int) {
     return false;
 }
 
 void Widget::addChild(Widget *widget) {
     mChildren.push_back(widget);
+    widget->incRef();
     widget->setParent(this);
+}
+
+void Widget::removeChild(const Widget *widget) {
+    mChildren.erase(std::remove(mChildren.begin(), mChildren.end(), widget), mChildren.end());
+    widget->decRef();
+}
+
+void Widget::removeChild(int index) {
+    Widget *widget = mChildren[index];
+    mChildren.erase(mChildren.begin() + index);
+    widget->decRef();
 }
 
 Window *Widget::window() {
@@ -127,7 +163,7 @@ Window *Widget::window() {
     }
 }
 
-inline void Widget::requestFocus() {
+void Widget::requestFocus() {
     Widget *widget = this;
     while (widget->parent())
         widget = widget->parent();
@@ -153,4 +189,31 @@ void Widget::draw(NVGcontext *ctx) {
     nvgTranslate(ctx, -mPos.x(), -mPos.y());
 }
 
-NANOGUI_NAMESPACE_END
+void Widget::save(Serializer &s) const {
+    s.set("position", mPos);
+    s.set("size", mSize);
+    s.set("fixedSize", mFixedSize);
+    s.set("visible", mVisible);
+    s.set("enabled", mEnabled);
+    s.set("focused", mFocused);
+    s.set("tooltip", mTooltip);
+    s.set("fontSize", mFontSize);
+    s.set("cursor", (int) mCursor);
+}
+
+bool Widget::load(Serializer &s) {
+    if (!s.get("position", mPos)) return false;
+    if (!s.get("size", mSize)) return false;
+    if (!s.get("fixedSize", mFixedSize)) return false;
+    if (!s.get("visible", mVisible)) return false;
+    if (!s.get("enabled", mEnabled)) return false;
+    if (!s.get("focused", mFocused)) return false;
+    if (!s.get("tooltip", mTooltip)) return false;
+    if (!s.get("fontSize", mFontSize)) return false;
+    int cursor;
+    if (!s.get("cursor", cursor)) return false;
+    mCursor = (Cursor) cursor;
+    return true;
+}
+
+NAMESPACE_END(nanogui)

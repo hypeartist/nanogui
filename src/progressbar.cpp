@@ -1,12 +1,24 @@
+/*
+    src/progressbar.cpp -- Standard widget for visualizing progress
+
+    NanoGUI was developed by Wenzel Jakob <wenzel@inf.ethz.ch>.
+    The widget drawing code is based on the NanoVG demo application
+    by Mikko Mononen.
+
+    All rights reserved. Use of this source code is governed by a
+    BSD-style license that can be found in the LICENSE.txt file.
+*/
+
 #include <nanogui/progressbar.h>
 #include <nanogui/opengl.h>
+#include <nanogui/serializer/core.h>
 
-NANOGUI_NAMESPACE_BEGIN
+NAMESPACE_BEGIN(nanogui)
 
 ProgressBar::ProgressBar(Widget *parent)
     : Widget(parent), mValue(0.0f) {}
 
-Vector2i ProgressBar::preferredSize(NVGcontext *ctx) const {
+Vector2i ProgressBar::preferredSize(NVGcontext *) const {
     return Vector2i(70, 12);
 }
 
@@ -37,4 +49,17 @@ void ProgressBar::draw(NVGcontext* ctx) {
     nvgFill(ctx);
 }
 
-NANOGUI_NAMESPACE_END
+void ProgressBar::save(Serializer &s) const {
+    Widget::save(s);
+    s.set("value", mValue);
+}
+
+bool ProgressBar::load(Serializer &s) {
+    if (!Widget::load(s))
+        return false;
+    if (!s.get("value", mValue))
+        return false;
+    return true;
+}
+
+NAMESPACE_END(nanogui)

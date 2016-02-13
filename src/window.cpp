@@ -1,12 +1,67 @@
+/*
+    src/window.cpp -- Top-level window widget
+
+    NanoGUI was developed by Wenzel Jakob <wenzel@inf.ethz.ch>.
+    The widget drawing code is based on the NanoVG demo application
+    by Mikko Mononen.
+
+    All rights reserved. Use of this source code is governed by a
+    BSD-style license that can be found in the LICENSE.txt file.
+*/
+
 #include <nanogui/window.h>
 #include <nanogui/theme.h>
 #include <nanogui/opengl.h>
 #include <nanogui/screen.h>
+#include <nanogui/layout.h>
+#include <nanogui/serializer/core.h>
 
-NANOGUI_NAMESPACE_BEGIN
+NAMESPACE_BEGIN(nanogui)
 
 Window::Window(Widget *parent, const std::string &title)
-    : Widget(parent), mTitle(title), mModal(false) { }
+    : Widget(parent), mTitle(title), mButtonPanel(nullptr), mModal(false), mDrag(false) { }
+
+Vector2i Window::preferredSize(NVGcontext *ctx) const {
+    if (mButtonPanel)
+        mButtonPanel->setVisible(false);
+    Vector2i result = Widget::preferredSize(ctx);
+    if (mButtonPanel)
+        mButtonPanel->setVisible(true);
+
+    nvgFontSize(ctx, 18.0f);
+    nvgFontFace(ctx, "sans-bold");
+    float bounds[4];
+    nvgTextBounds(ctx, 0, 0, mTitle.c_str(), nullptr, bounds);
+
+    return result.cwiseMax(Vector2i(
+        bounds[2]-bounds[0] + 20, bounds[3]-bounds[1]
+    ));
+}
+
+Widget *Window::buttonPanel() {
+    if (!mButtonPanel) {
+        mButtonPanel = new Widget(this);
+        mButtonPanel->setLayout(new BoxLayout(Orientation::Horizontal, Alignment::Middle, 0, 4));
+    }
+    return mButtonPanel;
+}
+
+void Window::performLayout(NVGcontext *ctx) {
+    if (!mButtonPanel) {
+        Widget::performLayout(ctx);
+    } else {
+        mButtonPanel->setVisible(false);
+        Widget::performLayout(ctx);
+        for (auto w : mButtonPanel->children()) {
+            w->setFixedSize(Vector2i(22, 22));
+            w->setFontSize(15);
+        }
+        mButtonPanel->setVisible(true);
+        mButtonPanel->setSize(Vector2i(width(), 22));
+        mButtonPanel->setPosition(Vector2i(width() - (mButtonPanel->preferredSize(ctx).x() + 5), 3));
+        mButtonPanel->performLayout(ctx);
+    }
+}
 
 void Window::draw(NVGcontext *ctx) {
     int ds = mTheme->mWindowDropShadowSize, cr = mTheme->mWindowCornerRadius;
@@ -94,17 +149,25 @@ void Window::center() {
     ((Screen *) widget)->centerWindow(this);
 }
 
-bool Window::mouseDragEvent(const Vector2i &p, const Vector2i &rel, int button, int modifiers) {
-    if ((p.y() - mPos.y() - rel.y()) < mTheme->mWindowHeaderHeight) {
+bool Window::mouseDragEvent(const Vector2i &, const Vector2i &rel,
+                            int button, int /* modifiers */) {
+    if (mDrag && (button & (1 << GLFW_MOUSE_BUTTON_1)) != 0) {
         mPos += rel;
+        mPos = mPos.cwiseMax(Vector2i::Zero());
+        mPos = mPos.cwiseMin(parent()->size() - mSize);
         return true;
     }
     return false;
 }
 
 bool Window::mouseButtonEvent(const Vector2i &p, int button, bool down, int modifiers) {
-    Widget::mouseButtonEvent(p, button, down, modifiers);
-    return true;
+    if (Widget::mouseButtonEvent(p, button, down, modifiers))
+        return true;
+    if (button == GLFW_MOUSE_BUTTON_1) {
+        mDrag = down && (p.y() - mPos.y()) < mTheme->mWindowHeaderHeight;
+        return true;
+    }
+    return false;
 }
 
 bool Window::scrollEvent(const Vector2i &p, const Vector2f &rel) {
@@ -116,4 +179,18 @@ void Window::refreshRelativePlacement() {
     /* Overridden in \ref Popup */
 }
 
-NANOGUI_NAMESPACE_END
+void Window::save(Serializer &s) const {
+    Widget::save(s);
+    s.set("title", mTitle);
+    s.set("modal", mModal);
+}
+
+bool Window::load(Serializer &s) {
+    if (!Widget::load(s)) return false;
+    if (!s.get("title", mTitle)) return false;
+    if (!s.get("modal", mModal)) return false;
+    mDrag = false;
+    return true;
+}
+
+NAMESPACE_END(nanogui)

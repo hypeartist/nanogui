@@ -1,36 +1,47 @@
-#if !defined(__NANOGUI_CHECKBOX_H)
-#define __NANOGUI_CHECKBOX_H
+/*
+    nanogui/checkbox.h -- Two-state check box widget
+
+    NanoGUI was developed by Wenzel Jakob <wenzel@inf.ethz.ch>.
+    The widget drawing code is based on the NanoVG demo application
+    by Mikko Mononen.
+
+    All rights reserved. Use of this source code is governed by a
+    BSD-style license that can be found in the LICENSE.txt file.
+*/
+
+#pragma once
 
 #include <nanogui/widget.h>
 
-NANOGUI_NAMESPACE_BEGIN
+NAMESPACE_BEGIN(nanogui)
 
-class CheckBox : public Widget {
+class NANOGUI_EXPORT CheckBox : public Widget {
 public:
     CheckBox(Widget *parent, const std::string &caption = "Untitled",
              const std::function<void(bool)> &callback = std::function<void(bool)>());
 
-    inline const std::string &caption() const { return mCaption; }
-    inline void setCaption(const std::string &caption) { mCaption = caption; }
+    const std::string &caption() const { return mCaption; }
+    void setCaption(const std::string &caption) { mCaption = caption; }
 
-    inline const bool &checked() const { return mChecked; }
-    inline void setChecked(const bool &checked) { mChecked = checked; }
+    const bool &checked() const { return mChecked; }
+    void setChecked(const bool &checked) { mChecked = checked; }
 
-    inline const bool &pushed() const { return mPushed; }
-    inline void setPushed(const bool &pushed) { mPushed = pushed; }
+    const bool &pushed() const { return mPushed; }
+    void setPushed(const bool &pushed) { mPushed = pushed; }
 
-    inline std::function<void(bool)> callback() const { return mCallback; }
-    inline void setCallback(std::function<void(bool)> callback) { mCallback = callback; }
+    std::function<void(bool)> callback() const { return mCallback; }
+    void setCallback(const std::function<void(bool)> &callback) { mCallback = callback; }
 
     virtual bool mouseButtonEvent(const Vector2i &p, int button, bool down, int modifiers);
     virtual Vector2i preferredSize(NVGcontext *ctx) const;
     virtual void draw(NVGcontext *ctx);
+
+    virtual void save(Serializer &s) const;
+    virtual bool load(Serializer &s);
 protected:
     std::string mCaption;
     bool mPushed, mChecked;
     std::function<void(bool)> mCallback;
 };
 
-NANOGUI_NAMESPACE_END
-
-#endif /* __NANOGUI_CHECKBOX_H */
+NAMESPACE_END(nanogui)

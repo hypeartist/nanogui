@@ -1,12 +1,25 @@
-#if !defined(__NANOGUI_OPENGL_H)
-#define __NANOGUI_OPENGL_H
+/*
+    nanogui/opengl.h -- Pulls in OpenGL, GLEW (if needed), GLFW, and
+    NanoVG header files
 
-#include <nanogui/nanogui.h>
+    NanoGUI was developed by Wenzel Jakob <wenzel@inf.ethz.ch>.
+    The widget drawing code is based on the NanoVG demo application
+    by Mikko Mononen.
+
+    All rights reserved. Use of this source code is governed by a
+    BSD-style license that can be found in the LICENSE.txt file.
+*/
+
+#pragma once
+
+#include <nanogui/common.h>
 
 #if defined(__APPLE__)
     #define GLFW_INCLUDE_GLCOREARB
-#elif defined(WIN32)
+#elif defined(_WIN32)
+    #ifndef GLEW_STATIC
     #define GLEW_STATIC
+    #endif
     #include <GL/glew.h>
 #else
     #define GL_GLEXT_PROTOTYPES
@@ -15,7 +28,7 @@
 #include <GLFW/glfw3.h>
 #include <nanovg.h>
 
-NANOGUI_NAMESPACE_BEGIN
+NAMESPACE_BEGIN(nanogui)
 
 inline Color::operator const NVGcolor &() const {
     return reinterpret_cast<const NVGcolor &>(*this->data());
@@ -27,6 +40,4 @@ inline bool nvgIsImageIcon(int value) { return value < 1024; }
 /// Determine whether an icon ID is a font-based icon (e.g. from the entypo.ttf font)
 inline bool nvgIsFontIcon(int value) { return value >= 1024; }
 
-NANOGUI_NAMESPACE_END
-
-#endif /* __NANOGUI_OPENGL_H */
+NAMESPACE_END(nanogui)

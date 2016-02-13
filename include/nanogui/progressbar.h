@@ -1,24 +1,34 @@
-#if !defined(__NANOGUI_PROGRESSBAR_H)
-#define __NANOGUI_PROGRESSBAR_H
+/*
+    nanogui/progressbar.h -- Standard widget for visualizing progress
+
+    NanoGUI was developed by Wenzel Jakob <wenzel@inf.ethz.ch>.
+    The widget drawing code is based on the NanoVG demo application
+    by Mikko Mononen.
+
+    All rights reserved. Use of this source code is governed by a
+    BSD-style license that can be found in the LICENSE.txt file.
+*/
+
+#pragma once
 
 #include <nanogui/widget.h>
 
-NANOGUI_NAMESPACE_BEGIN
+NAMESPACE_BEGIN(nanogui)
 
-class ProgressBar : public Widget {
+class NANOGUI_EXPORT ProgressBar : public Widget {
 public:
     ProgressBar(Widget *parent);
 
-    inline float value() { return mValue; }
-    inline void setValue(float value) { mValue = value; }
+    float value() { return mValue; }
+    void setValue(float value) { mValue = value; }
 
     virtual Vector2i preferredSize(NVGcontext *ctx) const;
     virtual void draw(NVGcontext* ctx);
+
+    virtual void save(Serializer &s) const;
+    virtual bool load(Serializer &s);
 protected:
     float mValue;
 };
 
-
-NANOGUI_NAMESPACE_END
-
-#endif /* __NANOGUI_PROGRESSBAR_H */
+NAMESPACE_END(nanogui)

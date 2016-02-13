@@ -1,10 +1,23 @@
+/*
+    src/glutil.cpp -- Convenience classes for accessing OpenGL >= 3.x
+
+    NanoGUI was developed by Wenzel Jakob <wenzel@inf.ethz.ch>.
+    The widget drawing code is based on the NanoVG demo application
+    by Mikko Mononen.
+
+    All rights reserved. Use of this source code is governed by a
+    BSD-style license that can be found in the LICENSE.txt file.
+*/
+
 #include <nanogui/glutil.h>
 #include <iostream>
 #include <fstream>
 
 namespace nanogui {
 
-static GLuint createShader_helper(GLint type, const std::string &defines, std::string shader_string) {
+static GLuint createShader_helper(GLint type, const std::string &name,
+                                  const std::string &defines,
+                                  std::string shader_string) {
     if (shader_string.empty())
         return (GLuint) 0;
 
@@ -34,12 +47,14 @@ static GLuint createShader_helper(GLint type, const std::string &defines, std::s
 
     if (status != GL_TRUE) {
         char buffer[512];
+        std::cerr << "Error while compiling ";
         if (type == GL_VERTEX_SHADER)
-            std::cerr << "Vertex shader:" << std::endl;
+            std::cerr << "vertex shader";
         else if (type == GL_FRAGMENT_SHADER)
-            std::cerr << "Fragment shader:" << std::endl;
+            std::cerr << "fragment shader";
         else if (type == GL_GEOMETRY_SHADER)
-            std::cerr << "Geometry shader:" << std::endl;
+            std::cerr << "geometry shader";
+        std::cerr << " \"" << name << "\":" << std::endl;
         std::cerr << shader_string << std::endl << std::endl;
         glGetShaderInfoLog(id, 512, nullptr, buffer);
         std::cerr << "Error: " << std::endl << buffer << std::endl;
@@ -54,7 +69,9 @@ bool GLShader::initFromFiles(
     const std::string &vertex_fname,
     const std::string &fragment_fname,
     const std::string &geometry_fname) {
-    auto file_to_string = [](const std::string &filename) {
+    auto file_to_string = [](const std::string &filename) -> std::string {
+        if (filename.empty())
+            return "";
         std::ifstream t(filename);
         return std::string((std::istreambuf_iterator<char>(t)),
                            std::istreambuf_iterator<char>());
@@ -77,13 +94,15 @@ bool GLShader::init(const std::string &name,
     glGenVertexArrays(1, &mVertexArrayObject);
     mName = name;
     mVertexShader =
-        createShader_helper(GL_VERTEX_SHADER, defines, vertex_str);
+        createShader_helper(GL_VERTEX_SHADER, name, defines, vertex_str);
     mGeometryShader =
-        createShader_helper(GL_GEOMETRY_SHADER, defines, geometry_str);
+        createShader_helper(GL_GEOMETRY_SHADER, name, defines, geometry_str);
     mFragmentShader =
-        createShader_helper(GL_FRAGMENT_SHADER, defines, fragment_str);
+        createShader_helper(GL_FRAGMENT_SHADER, name, defines, fragment_str);
 
     if (!mVertexShader || !mFragmentShader)
+        return false;
+    if (!geometry_str.empty() && !mGeometryShader)
         return false;
 
     mProgramShader = glCreateProgram();
@@ -102,7 +121,7 @@ bool GLShader::init(const std::string &name,
     if (status != GL_TRUE) {
         char buffer[512];
         glGetProgramInfoLog(mProgramShader, 512, nullptr, buffer);
-        std::cerr << "Linker error: " << std::endl << buffer << std::endl;
+        std::cerr << "Linker error (" << mName << "): " << std::endl << buffer << std::endl;
         mProgramShader = 0;
         throw std::runtime_error("Shader linking failed!");
     }
@@ -130,7 +149,8 @@ GLint GLShader::uniform(const std::string &name, bool warn) const {
 }
 
 void GLShader::uploadAttrib(const std::string &name, uint32_t size, int dim,
-                             uint32_t compSize, GLuint glType, bool integral, const uint8_t *data, int version) {
+                            uint32_t compSize, GLuint glType, bool integral,
+                            const uint8_t *data, int version) {
     int attribID = 0;
     if (name != "indices") {
         attribID = attrib(name);
@@ -174,8 +194,8 @@ void GLShader::uploadAttrib(const std::string &name, uint32_t size, int dim,
     }
 }
 
-void GLShader::downloadAttrib(const std::string &name, uint32_t size, int dim,
-                             uint32_t compSize, GLuint glType, uint8_t *data) {
+void GLShader::downloadAttrib(const std::string &name, uint32_t size, int /* dim */,
+                             uint32_t compSize, GLuint /* glType */, uint8_t *data) {
     auto it = mBufferObjects.find(name);
     if (it == mBufferObjects.end())
         throw std::runtime_error("downloadAttrib(" + mName + ", " + name + ") : buffer not found!");
@@ -214,7 +234,7 @@ void GLShader::shareAttrib(const GLShader &otherShader, const std::string &name,
     }
 }
 
-void GLShader::invalidateAttribss() {
+void GLShader::invalidateAttribs() {
     for (auto &buffer : mBufferObjects)
         buffer.second.version = -1;
 }
@@ -256,22 +276,10 @@ void GLShader::free() {
     if (mVertexArrayObject)
         glDeleteVertexArrays(1, &mVertexArrayObject);
 
-    if (mProgramShader) {
-        glDeleteProgram(mProgramShader);
-        mProgramShader = 0;
-    }
-    if (mVertexShader) {
-        glDeleteShader(mVertexShader);
-        mVertexShader = 0;
-    }
-    if (mFragmentShader) {
-        glDeleteShader(mFragmentShader);
-        mFragmentShader = 0;
-    }
-    if (mGeometryShader) {
-        glDeleteShader(mGeometryShader);
-        mGeometryShader = 0;
-    }
+    glDeleteProgram(mProgramShader); mProgramShader = 0;
+    glDeleteShader(mVertexShader);   mVertexShader = 0;
+    glDeleteShader(mFragmentShader); mFragmentShader = 0;
+    glDeleteShader(mGeometryShader); mGeometryShader = 0;
 }
 
 void GLFramebuffer::init(const Vector2i &size, int nSamples) {
@@ -337,6 +345,51 @@ void GLFramebuffer::blit() {
                       GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT, GL_NEAREST);
 
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
+}
+
+void GLFramebuffer::downloadTGA(const std::string &filename) {
+	uint8_t *temp = new uint8_t[mSize.prod() * 4];
+
+    std::cout << "Writing \"" << filename  << "\" (" << mSize.x() << "x" << mSize.y() << ") .. ";
+    std::cout.flush();
+	glPixelStorei(GL_PACK_ALIGNMENT, 1);
+	glBindFramebuffer(GL_READ_FRAMEBUFFER, mFramebuffer);
+	glBindBuffer(GL_PIXEL_PACK_BUFFER, 0);
+	glReadPixels(0, 0, mSize.x(), mSize.y(), GL_BGRA, GL_UNSIGNED_BYTE, temp);
+	glBindFramebuffer(GL_READ_FRAMEBUFFER, 0);
+
+	uint32_t rowSize = mSize.x() * 4;
+	uint32_t halfHeight = mSize.y() / 2;
+	uint8_t *line = (uint8_t *) alloca(rowSize);
+	for (uint32_t i=0, j=mSize.y()-1; i<halfHeight; ++i) {
+		memcpy(line, temp + i * rowSize, rowSize);
+		memcpy(temp + i * rowSize, temp + j * rowSize, rowSize);
+		memcpy(temp + j * rowSize, line, rowSize);
+		j--;
+	}
+
+	FILE *tga = fopen(filename.c_str(), "wb");
+	if (tga == nullptr)
+	    throw std::runtime_error("GLFramebuffer::downloadTGA(): Could not open output file");
+	fputc(0, tga); /* ID */
+	fputc(0, tga); /* Color map */
+	fputc(2, tga); /* Image type */
+	fputc(0, tga); fputc(0, tga); /* First entry of color map (unused) */
+	fputc(0, tga); fputc(0, tga); /* Length of color map (unused) */
+	fputc(0, tga); /* Color map entry size (unused) */
+	fputc(0, tga); fputc(0, tga);  /* X offset */
+	fputc(0, tga); fputc(0, tga);  /* Y offset */
+	fputc(mSize.x() % 256, tga); /* Width */
+	fputc(mSize.x() / 256, tga); /* continued */
+	fputc(mSize.y() % 256, tga); /* Height */
+	fputc(mSize.y() / 256, tga); /* continued */
+	fputc(32, tga);   /* Bits per pixel */
+	fputc(0x20, tga); /* Scan from top left */
+	fwrite(temp, mSize.prod() * 4, 1, tga);
+	fclose(tga);
+
+	delete[] temp;
+    std::cout << "done." << std::endl;
 }
 
 Eigen::Vector3f project(const Eigen::Vector3f &obj,

@@ -1,13 +1,28 @@
+/*
+    src/vscrollpanel.cpp -- Adds a vertical scrollbar around a widget
+    that is too big to fit into a certain area
+
+    NanoGUI was developed by Wenzel Jakob <wenzel@inf.ethz.ch>.
+    The widget drawing code is based on the NanoVG demo application
+    by Mikko Mononen.
+
+    All rights reserved. Use of this source code is governed by a
+    BSD-style license that can be found in the LICENSE.txt file.
+*/
+
 #include <nanogui/vscrollpanel.h>
 #include <nanogui/theme.h>
 #include <nanogui/opengl.h>
+#include <nanogui/serializer/core.h>
 
-NANOGUI_NAMESPACE_BEGIN
+NAMESPACE_BEGIN(nanogui)
 
 VScrollPanel::VScrollPanel(Widget *parent)
-    : Widget(parent), mChildPreferredHeight(0), mScroll(0.0f) {}
+    : Widget(parent), mChildPreferredHeight(0), mScroll(0.0f) { }
 
 void VScrollPanel::performLayout(NVGcontext *ctx) {
+    Widget::performLayout(ctx);
+
     if (mChildren.empty())
         return;
     Widget *child = mChildren[0];
@@ -22,8 +37,8 @@ Vector2i VScrollPanel::preferredSize(NVGcontext *ctx) const {
     return mChildren[0]->preferredSize(ctx) + Vector2i(12, 0);
 }
 
-bool VScrollPanel::mouseDragEvent(const Vector2i &p, const Vector2i &rel,
-                            int button, int modifiers) {
+bool VScrollPanel::mouseDragEvent(const Vector2i &, const Vector2i &rel,
+                            int, int) {
     if (mChildren.empty())
         return false;
 
@@ -35,7 +50,7 @@ bool VScrollPanel::mouseDragEvent(const Vector2i &p, const Vector2i &rel,
     return true;
 }
 
-bool VScrollPanel::scrollEvent(const Vector2i &p, const Vector2f &rel) {
+bool VScrollPanel::scrollEvent(const Vector2i &/* p */, const Vector2f &rel) {
     float scrollAmount = rel.y() * (mSize.y() / 20.0f);
     float scrollh = height() *
         std::min(1.0f, height() / (float)mChildPreferredHeight);
@@ -97,4 +112,17 @@ void VScrollPanel::draw(NVGcontext *ctx) {
     nvgFill(ctx);
 }
 
-NANOGUI_NAMESPACE_END
+void VScrollPanel::save(Serializer &s) const {
+    Widget::save(s);
+    s.set("childPreferredHeight", mChildPreferredHeight);
+    s.set("scroll", mScroll);
+}
+
+bool VScrollPanel::load(Serializer &s) {
+    if (!Widget::load(s)) return false;
+    if (!s.get("childPreferredHeight", mChildPreferredHeight)) return false;
+    if (!s.get("scroll", mScroll)) return false;
+    return true;
+}
+
+NAMESPACE_END(nanogui)

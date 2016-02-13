@@ -1,7 +1,19 @@
+/*
+    src/imagepanel.cpp -- Image panel widget which shows a number of
+    square-shaped icons
+
+    NanoGUI was developed by Wenzel Jakob <wenzel@inf.ethz.ch>.
+    The widget drawing code is based on the NanoVG demo application
+    by Mikko Mononen.
+
+    All rights reserved. Use of this source code is governed by a
+    BSD-style license that can be found in the LICENSE.txt file.
+*/
+
 #include <nanogui/imagepanel.h>
 #include <nanogui/opengl.h>
 
-NANOGUI_NAMESPACE_BEGIN
+NAMESPACE_BEGIN(nanogui)
 
 ImagePanel::ImagePanel(Widget *parent)
     : Widget(parent), mThumbSize(64), mSpacing(10), mMargin(10),
@@ -27,20 +39,21 @@ int ImagePanel::indexForPosition(const Vector2i &p) const {
     return overImage ? (gridPos.x() + gridPos.y() * grid.x()) : -1;
 }
 
-bool ImagePanel::mouseMotionEvent(const Vector2i &p, const Vector2i &rel,
-                              int button, int modifiers) {
+bool ImagePanel::mouseMotionEvent(const Vector2i &p, const Vector2i & /* rel */,
+                              int /* button */, int /* modifiers */) {
     mMouseIndex = indexForPosition(p);
     return true;
 }
 
-bool ImagePanel::mouseButtonEvent(const Vector2i &p, int button, bool down, int modifiers) {
+bool ImagePanel::mouseButtonEvent(const Vector2i &p, int /* button */, bool down,
+                                  int /* modifiers */) {
     int index = indexForPosition(p);
     if (index >= 0 && mCallback && down)
         mCallback(index);
     return true;
 }
 
-Vector2i ImagePanel::preferredSize(NVGcontext *ctx) const {
+Vector2i ImagePanel::preferredSize(NVGcontext *) const {
     Vector2i grid = gridSize();
     return Vector2i(
         grid.x() * mThumbSize + (grid.x() - 1) * mSpacing + 2*mMargin,
@@ -97,4 +110,4 @@ void ImagePanel::draw(NVGcontext* ctx) {
     }
 }
 
-NANOGUI_NAMESPACE_END
+NAMESPACE_END(nanogui)

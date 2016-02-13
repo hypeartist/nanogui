@@ -1,13 +1,23 @@
-#if !defined(__NANOGUI_MESSAGEDIALOG_H)
-#define __NANOGUI_MESSAGEDIALOG_H
+/*
+    nanogui/messagedialog.h -- Simple "OK" or "Yes/No"-style modal dialogs
+
+    NanoGUI was developed by Wenzel Jakob <wenzel@inf.ethz.ch>.
+    The widget drawing code is based on the NanoVG demo application
+    by Mikko Mononen.
+
+    All rights reserved. Use of this source code is governed by a
+    BSD-style license that can be found in the LICENSE.txt file.
+*/
+
+#pragma once
 
 #include <nanogui/window.h>
 
-NANOGUI_NAMESPACE_BEGIN
+NAMESPACE_BEGIN(nanogui)
 
-class MessageDialog : public Window {
+class NANOGUI_EXPORT MessageDialog : public Window {
 public:
-    enum Type {
+    enum class Type {
         Information,
         Question,
         Warning
@@ -18,12 +28,14 @@ public:
                   const std::string &buttonText = "OK",
                   const std::string &altButtonText = "Cancel", bool altButton = false);
 
-    inline std::function<void(int)> callback() const { return mCallback; }
-    inline void setCallback(std::function<void(int)> callback) { mCallback = callback; }
+    Label *messageLabel() { return mMessageLabel; }
+    const Label *messageLabel() const { return mMessageLabel; }
+
+    std::function<void(int)> callback() const { return mCallback; }
+    void setCallback(const std::function<void(int)> &callback) { mCallback = callback; }
 protected:
     std::function<void(int)> mCallback;
+    Label *mMessageLabel;
 };
 
-NANOGUI_NAMESPACE_END
-
-#endif /* __NANOGUI_MESSAGEDIALOG_H */
+NAMESPACE_END(nanogui)

@@ -1,14 +1,25 @@
-#if !defined(__NANOGUI_GLUTIL_H)
-#define __NANOGUI_GLUTIL_H
+/*
+    nanogui/glutil.h -- Convenience classes for accessing OpenGL >= 3.x
+
+    NanoGUI was developed by Wenzel Jakob <wenzel@inf.ethz.ch>.
+    The widget drawing code is based on the NanoVG demo application
+    by Mikko Mononen.
+
+    All rights reserved. Use of this source code is governed by a
+    BSD-style license that can be found in the LICENSE.txt file.
+*/
+
+#pragma once
 
 #include <nanogui/opengl.h>
 #include <Eigen/Geometry>
 #include <map>
 
-NANOGUI_NAMESPACE_BEGIN
+namespace half_float { class half; }
 
-using Eigen::Quaternionf;
+NAMESPACE_BEGIN(nanogui)
 
+NAMESPACE_BEGIN(detail)
 template <typename T> struct type_traits;
 template <> struct type_traits<uint32_t> { enum { type = GL_UNSIGNED_INT, integral = 1 }; };
 template <> struct type_traits<int32_t> { enum { type = GL_INT, integral = 1 }; };
@@ -18,12 +29,18 @@ template <> struct type_traits<uint8_t> { enum { type = GL_UNSIGNED_BYTE, integr
 template <> struct type_traits<int8_t> { enum { type = GL_BYTE, integral = 1 }; };
 template <> struct type_traits<double> { enum { type = GL_DOUBLE, integral = 0 }; };
 template <> struct type_traits<float> { enum { type = GL_FLOAT, integral = 0 }; };
+template <> struct type_traits<half_float::half> { enum { type = GL_HALF_FLOAT, integral = 0 }; };
+template <typename T> struct serialization_helper;
+NAMESPACE_END(detail)
+
+using Eigen::Quaternionf;
 
 /**
  * Helper class for compiling and linking OpenGL shaders and uploading
  * associated vertex and index buffers from Eigen matrices
  */
-class GLShader {
+class NANOGUI_EXPORT GLShader {
+    template <typename T> friend struct detail::serialization_helper;
 public:
     /// Create an unitialized OpenGL shader
     GLShader()
@@ -62,17 +79,17 @@ public:
     /// Upload an Eigen matrix as a vertex buffer object (refreshing it as needed)
     template <typename Matrix> void uploadAttrib(const std::string &name, const Matrix &M, int version = -1) {
         uint32_t compSize = sizeof(typename Matrix::Scalar);
-        GLuint glType = (GLuint) type_traits<typename Matrix::Scalar>::type;
-        bool integral = (bool) type_traits<typename Matrix::Scalar>::integral;
+        GLuint glType = (GLuint) detail::type_traits<typename Matrix::Scalar>::type;
+        bool integral = (bool) detail::type_traits<typename Matrix::Scalar>::integral;
 
-        uploadAttrib(name, M.size(), M.rows(), compSize,
-                glType, integral, (const uint8_t *) M.data(), version);
+        uploadAttrib(name, (uint32_t) M.size(), (int) M.rows(), compSize,
+                     glType, integral, (const uint8_t *) M.data(), version);
     }
 
     /// Download a vertex buffer object into an Eigen matrix
     template <typename Matrix> void downloadAttrib(const std::string &name, Matrix &M) {
         uint32_t compSize = sizeof(typename Matrix::Scalar);
-        GLuint glType = (GLuint) type_traits<typename Matrix::Scalar>::type;
+        GLuint glType = (GLuint) detail::type_traits<typename Matrix::Scalar>::type;
 
         auto it = mBufferObjects.find(name);
         if (it == mBufferObjects.end())
@@ -90,13 +107,13 @@ public:
     }
 
     /// Invalidate the version numbers assiciated with attribute data
-    void invalidateAttribss();
+    void invalidateAttribs();
 
     /// Completely free an existing attribute buffer
     void freeAttrib(const std::string &name);
 
     /// Check if an attribute was registered a given name
-    inline bool hasAttrib(const std::string &name) const { 
+    bool hasAttrib(const std::string &name) const { 
         auto it = mBufferObjects.find(name);
         if (it == mBufferObjects.end())
             return false;
@@ -107,7 +124,7 @@ public:
     void shareAttrib(const GLShader &otherShader, const std::string &name, const std::string &as = "");
 
     /// Return the version number of a given attribute
-    inline int attribVersion(const std::string &name) const {
+    int attribVersion(const std::string &name) const {
         auto it = mBufferObjects.find(name);
         if (it == mBufferObjects.end())
             return -1;
@@ -115,7 +132,7 @@ public:
     }
 
     /// Reset the version number of a given attribute
-    inline void resetAttribVersion(const std::string &name) {
+    void resetAttribVersion(const std::string &name) {
         auto it = mBufferObjects.find(name);
         if (it != mBufferObjects.end())
             it->second.version = -1;
@@ -190,7 +207,7 @@ protected:
 };
 
 /// Helper class for creating framebuffer objects
-class GLFramebuffer {
+class NANOGUI_EXPORT GLFramebuffer {
 public:
     GLFramebuffer() : mFramebuffer(0), mDepth(0), mColor(0), mSamples(0) { }
 
@@ -200,7 +217,7 @@ public:
     /// Release all associated resources
     void free();
 
-    /// Bind the framebuffer boject
+    /// Bind the framebuffer object
     void bind();
 
     /// Release/unbind the framebuffer object
@@ -210,10 +227,13 @@ public:
     void blit();
 
     /// Return whether or not the framebuffer object has been initialized
-    inline bool ready() { return mFramebuffer != 0; }
+    bool ready() { return mFramebuffer != 0; }
 
     /// Return the number of MSAA samples
     int samples() const { return mSamples; }
+
+    /// Quick and dirty method to write a TGA (32bpp RGBA) file of the framebuffer contents for debugging
+    void downloadTGA(const std::string &filename);
 protected:
     GLuint mFramebuffer, mDepth, mColor;
     Vector2i mSize;
@@ -228,13 +248,13 @@ struct Arcball {
           mIncr(Quaternionf::Identity()),
           mSpeedFactor(speedFactor) { }
 
-    inline Arcball(const Quaternionf &quat)
+    Arcball(const Quaternionf &quat)
         : mActive(false), mLastPos(Vector2i::Zero()), mSize(Vector2i::Zero()),
           mQuat(quat),
           mIncr(Quaternionf::Identity()),
           mSpeedFactor(2.0f) { }
 
-    inline Quaternionf &state() { return mQuat; }
+    Quaternionf &state() { return mQuat; }
 
     void setState(const Quaternionf &state) {
         mActive = false;
@@ -243,11 +263,11 @@ struct Arcball {
         mIncr = Quaternionf::Identity();
     }
 
-    inline void setSize(Vector2i size) { mSize = size; }
-    inline const Vector2i &size() const { return mSize; }
-    inline void setSpeedFactor(float speedFactor) { mSpeedFactor = speedFactor; }
-    inline float speedFactor() const { return mSpeedFactor; }
-    inline bool active() const { return mActive; }
+    void setSize(Vector2i size) { mSize = size; }
+    const Vector2i &size() const { return mSize; }
+    void setSpeedFactor(float speedFactor) { mSpeedFactor = speedFactor; }
+    float speedFactor() const { return mSpeedFactor; }
+    bool active() const { return mActive; }
 
     void button(Vector2i pos, bool pressed) {
         mActive = pressed;
@@ -289,7 +309,7 @@ struct Arcball {
         return true;
     }
 
-    Matrix4f matrix(const Matrix4f &view) const {
+    Matrix4f matrix() const {
         Matrix4f result2 = Matrix4f::Identity();
         result2.block<3,3>(0, 0) = (mIncr * mQuat).toRotationMatrix();
         return result2;
@@ -303,26 +323,24 @@ protected:
     float mSpeedFactor;
 };
 
-extern Vector3f project(const Vector3f &obj, const Matrix4f &model,
+extern NANOGUI_EXPORT Vector3f project(const Vector3f &obj, const Matrix4f &model,
                         const Matrix4f &proj, const Vector2i &viewportSize);
 
-extern Vector3f unproject(const Vector3f &win, const Matrix4f &model,
+extern NANOGUI_EXPORT Vector3f unproject(const Vector3f &win, const Matrix4f &model,
                           const Matrix4f &proj, const Vector2i &viewportSize);
 
-extern Matrix4f lookAt(const Vector3f &eye, const Vector3f &center,
+extern NANOGUI_EXPORT Matrix4f lookAt(const Vector3f &eye, const Vector3f &center,
                        const Vector3f &up);
 
-extern Matrix4f ortho(const float left, const float right, const float bottom,
+extern NANOGUI_EXPORT Matrix4f ortho(const float left, const float right, const float bottom,
                       const float top, const float zNear, const float zFar);
 
-extern Matrix4f frustum(const float left, const float right, const float bottom,
+extern NANOGUI_EXPORT Matrix4f frustum(const float left, const float right, const float bottom,
                         const float top, const float nearVal,
                         const float farVal);
 
-extern Matrix4f scale(const Matrix4f &m, const Vector3f &v);
+extern NANOGUI_EXPORT Matrix4f scale(const Matrix4f &m, const Vector3f &v);
 
-extern Matrix4f translate(const Matrix4f &m, const Vector3f &v);
+extern NANOGUI_EXPORT Matrix4f translate(const Matrix4f &m, const Vector3f &v);
 
-NANOGUI_NAMESPACE_END
-
-#endif /* __NANOGUI_GLUTIL_H */
+NAMESPACE_END(nanogui)

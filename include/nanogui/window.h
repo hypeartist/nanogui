@@ -1,24 +1,37 @@
-#if !defined(__NANOGUI_WINDOW_H)
-#define __NANOGUI_WINDOW_H
+/*
+    nanogui/window.h -- Top-level window widget
+
+    NanoGUI was developed by Wenzel Jakob <wenzel@inf.ethz.ch>.
+    The widget drawing code is based on the NanoVG demo application
+    by Mikko Mononen.
+
+    All rights reserved. Use of this source code is governed by a
+    BSD-style license that can be found in the LICENSE.txt file.
+*/
+
+#pragma once
 
 #include <nanogui/widget.h>
 
-NANOGUI_NAMESPACE_BEGIN
+NAMESPACE_BEGIN(nanogui)
 
-class Window : public Widget {
+class NANOGUI_EXPORT Window : public Widget {
     friend class Popup;
 public:
     Window(Widget *parent, const std::string &title = "Untitled");
 
     /// Return the window title
-    inline const std::string &title() const { return mTitle; }
+    const std::string &title() const { return mTitle; }
     /// Set the window title
-    inline void setTitle(const std::string &title) { mTitle = title; }
+    void setTitle(const std::string &title) { mTitle = title; }
 
     /// Is this a model dialog?
-    inline bool modal() const { return mModal; }
+    bool modal() const { return mModal; }
     /// Set whether or not this is a modal dialog
-    inline void setModal(bool modal) { mModal = modal; }
+    void setModal(bool modal) { mModal = modal; }
+
+    /// Return the panel used to house window buttons
+    Widget *buttonPanel();
 
     /// Dispose the window
     void dispose();
@@ -35,14 +48,20 @@ public:
     virtual bool mouseButtonEvent(const Vector2i &p, int button, bool down, int modifiers);
     /// Accept scroll events and propagate them to the widget under the mouse cursor
     virtual bool scrollEvent(const Vector2i &p, const Vector2f &rel);
+    /// Compute the preferred size of the widget
+    virtual Vector2i preferredSize(NVGcontext *ctx) const;
+    /// Invoke the associated layout generator to properly place child widgets, if any
+    virtual void performLayout(NVGcontext *ctx);
+    virtual void save(Serializer &s) const;
+    virtual bool load(Serializer &s);
 protected:
     /// Internal helper function to maintain nested window position values; overridden in \ref Popup
     virtual void refreshRelativePlacement();
 protected:
     std::string mTitle;
+    Widget *mButtonPanel;
     bool mModal;
+    bool mDrag;
 };
 
-NANOGUI_NAMESPACE_END
-
-#endif /* __NANOGUI_WINDOW_H */
+NAMESPACE_END(nanogui)
